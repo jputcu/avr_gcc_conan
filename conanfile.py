@@ -1,14 +1,16 @@
 from conans import ConanFile, CMake, tools
 from conans import AutoToolsBuildEnvironment
+import os
 
 class AvrGccConan(ConanFile):
     name = "AvrGcc"
     version = "10.2"
     settings = "os", "compiler", "build_type", "arch"
     generators = "cmake"
-    binutils_fullname = "binutils-2.34"
+    no_copy_source = True
+    binutils_fullname = "binutils-2.35.1"
     gcc_fullname = "gcc-10.2.0"
-    gdb_fullname = "gdb-9.2"
+    gdb_fullname = "gdb-10.1"
     libc_fullname = "avr-libc-2.0.0"
 
     def source_binutils(self):
@@ -42,8 +44,7 @@ class AvrGccConan(ConanFile):
                 "--disable-libssp",
                 "--disable-libada",
                 "--with-dwarf2",
-                "--disable-shared",
-                "--enable-static",
+                "--disable-shared","--enable-static",
                 "--enable-mingw-wildcard",
                 "--enable-plugin",
                 "--with-gnu-as"
@@ -82,6 +83,28 @@ class AvrGccConan(ConanFile):
                 autotools.make()
                 autotools.install()
 
+    def build_freestanding(self):
+        tools.mkdir(self.gcc_fullname)
+        with tools.chdir(self.gcc_fullname):
+            autotools = AutoToolsBuildEnvironment(self)
+            autotools.configure(args=[
+                "--disable-nls",
+                "--enable-languages=c,c++",
+                "--disable-libssp",
+                "--disable-libada",
+                "--with-dwarf2",
+                "--disable-shared","--enable-static",
+                "--enable-mingw-wildcard",
+                "--enable-plugin",
+                "--with-gnu-as",
+                "--with-newlib","--disable-__cxa_atexit","--disable-threads",
+                "--disable-sjlj-exceptions","--enable-libstdcxx","--enable-lto",
+                "--disable-hosted-libstdcxx"
+                ],
+                configure_dir="%s/%s" % (self.source_folder, self.gcc_fullname), target="avr")
+            autotools.make()
+            autotools.install()
+
     def source(self):
         self.source_binutils()
         self.source_gcc()
@@ -93,7 +116,11 @@ class AvrGccConan(ConanFile):
         self.build_gcc()
         self.build_gdb()
         self.build_libc()
+        self.build_freestanding()
 
     def package(self):
         self.copy("*", src="%s/package" % (self.build_folder))
+
+    def package_info(self):
+        self.env_info.PATH.append(os.path.join(self.package_folder, "bin"))
 
