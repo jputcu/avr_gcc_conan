@@ -5,6 +5,7 @@ import os
 class AvrGccConan(ConanFile):
     name = "AvrGcc"
     version = "10.2"
+    url = "https://github.com/jputcu/avr_gcc_conan"
     settings = "os", "compiler", "build_type", "arch"
     generators = "cmake"
     no_copy_source = True
@@ -23,7 +24,7 @@ class AvrGccConan(ConanFile):
         with tools.chdir(self.binutils_fullname):
             autotools = AutoToolsBuildEnvironment(self)
             autotools.configure(args=["--disable-nls","--disable-werror"],
-                configure_dir="%s/%s" % (self.source_folder, self.binutils_fullname), target="avr")
+                configure_dir=os.path.join(self.source_folder, self.binutils_fullname), target="avr")
             autotools.make()
             autotools.install()
 
@@ -37,21 +38,22 @@ class AvrGccConan(ConanFile):
     def build_gcc(self):
         tools.mkdir(self.gcc_fullname)
         with tools.chdir(self.gcc_fullname):
-            autotools = AutoToolsBuildEnvironment(self)
-            autotools.configure(args=[
-                "--disable-nls",
-                "--enable-languages=c,c++",
-                "--disable-libssp",
-                "--disable-libada",
-                "--with-dwarf2",
-                "--disable-shared","--enable-static",
-                "--enable-mingw-wildcard",
-                "--enable-plugin",
-                "--with-gnu-as"
-                ],
-                configure_dir="%s/%s" % (self.source_folder, self.gcc_fullname), target="avr")
-            autotools.make()
-            autotools.install()
+            with tools.environment_append({"PATH":[os.path.join(self.package_folder, "bin")]}):
+                autotools = AutoToolsBuildEnvironment(self)
+                autotools.configure(args=[
+                    "--disable-nls",
+                    "--enable-languages=c,c++",
+                    "--disable-libssp",
+                    "--disable-libada",
+                    "--with-dwarf2",
+                    "--disable-shared","--enable-static",
+                    "--enable-mingw-wildcard",
+                    "--enable-plugin",
+                    "--with-gnu-as"
+                    ],
+                    configure_dir=os.path.join(self.source_folder, self.gcc_fullname), target="avr")
+                autotools.make()
+                autotools.install()
 
     def source_gdb(self):
         gdb_zip = "%s.tar.xz" % (self.gdb_fullname)
@@ -61,13 +63,14 @@ class AvrGccConan(ConanFile):
     def build_gdb(self):
         tools.mkdir(self.gdb_fullname)
         with tools.chdir(self.gdb_fullname):
-            autotools = AutoToolsBuildEnvironment(self)
-            autotools.configure(args=[
-                "--with-static-standard-libraries",
-                "--disable-source-highlight"],
-                configure_dir="%s/%s" % (self.source_folder, self.gdb_fullname), target="avr")
-            autotools.make()
-            autotools.install()
+            with tools.environment_append({"PATH":[os.path.join(self.package_folder, "bin")]}):
+                autotools = AutoToolsBuildEnvironment(self)
+                autotools.configure(args=[
+                    "--with-static-standard-libraries",
+                    "--disable-source-highlight"],
+                    configure_dir=os.path.join(self.source_folder, self.gdb_fullname), target="avr")
+                autotools.make()
+                autotools.install()
 
     def source_libc(self):
         libc_zip = "%s.tar.bz2" % (self.libc_fullname)
@@ -77,33 +80,34 @@ class AvrGccConan(ConanFile):
     def build_libc(self):
         tools.mkdir(self.libc_fullname)
         with tools.chdir(self.libc_fullname):
-            with tools.environment_append({"PATH":["%s/bin" % (self.package_folder)]}):
+            with tools.environment_append({"PATH":[os.path.join(self.package_folder, "bin")]}):
                 autotools = AutoToolsBuildEnvironment(self)
-                autotools.configure(host="avr", configure_dir="%s/%s" % (self.source_folder, self.libc_fullname))
+                autotools.configure(host="avr", configure_dir=os.path.join(self.source_folder, self.libc_fullname))
                 autotools.make()
                 autotools.install()
 
     def build_freestanding(self):
         tools.mkdir(self.gcc_fullname)
         with tools.chdir(self.gcc_fullname):
-            autotools = AutoToolsBuildEnvironment(self)
-            autotools.configure(args=[
-                "--disable-nls",
-                "--enable-languages=c,c++",
-                "--disable-libssp",
-                "--disable-libada",
-                "--with-dwarf2",
-                "--disable-shared","--enable-static",
-                "--enable-mingw-wildcard",
-                "--enable-plugin",
-                "--with-gnu-as",
-                "--with-newlib","--disable-__cxa_atexit","--disable-threads",
-                "--disable-sjlj-exceptions","--enable-libstdcxx","--enable-lto",
-                "--disable-hosted-libstdcxx"
-                ],
-                configure_dir="%s/%s" % (self.source_folder, self.gcc_fullname), target="avr")
-            autotools.make()
-            autotools.install()
+            with tools.environment_append({"PATH":[os.path.join(self.package_folder, "bin")]}):
+                autotools = AutoToolsBuildEnvironment(self)
+                autotools.configure(args=[
+                    "--disable-nls",
+                    "--enable-languages=c,c++",
+                    "--disable-libssp",
+                    "--disable-libada",
+                    "--with-dwarf2",
+                    "--disable-shared","--enable-static",
+                    "--enable-mingw-wildcard",
+                    "--enable-plugin",
+                    "--with-gnu-as",
+                    "--with-newlib","--disable-__cxa_atexit","--disable-threads",
+                    "--disable-sjlj-exceptions","--enable-libstdcxx","--enable-lto",
+                    "--disable-hosted-libstdcxx"
+                    ],
+                    configure_dir=os.path.join(self.source_folder, self.gcc_fullname), target="avr")
+                autotools.make()
+                autotools.install()
 
     def source(self):
         self.source_binutils()
@@ -119,8 +123,12 @@ class AvrGccConan(ConanFile):
         self.build_freestanding()
 
     def package(self):
-        self.copy("*", src="%s/package" % (self.build_folder))
+        self.copy("*", src=os.path.join(self.build_folder, "package"))
 
     def package_info(self):
-        self.env_info.PATH.append(os.path.join(self.package_folder, "bin"))
+        bin_folder = os.path.join(self.package_folder, "bin")
+        self.env_info.PATH.append(bin_folder)
+        self.env_info.CC = os.path.join(bin_folder, "avr-gcc")
+        self.env_info.CXX = os.path.join(bin_folder, "avr-g++")
+        self.env_info.SYSROOT = self.package_folder
 
